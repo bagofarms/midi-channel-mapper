@@ -6,6 +6,7 @@
 #include <Adafruit_SPITFT_Macros.h>
 #include <gfxfont.h>
 
+// OLED Display
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
 
@@ -15,12 +16,18 @@ Adafruit_SSD1306 display(OLED_RESET);
 
 #define SIZE5_2DIGIT_XOFFSET 68
 #define SIZE5_2DIGIT_YOFFSET 24
+#define OLED_HEADER " MIDItron"
 
+
+// Potentiometer inputs
 #define MAX_POT_VALUE 1024
 #define CHAN_IN_POT 2
 #define CHAN_OUT_POT 3
 
-#define OLED_HEADER " MIDItron"
+// MIDI Constants
+#define COMMAND_PROGRAMCHANGE 0xC
+#define COMMAND_AFTERTOUCH 0xD
+#define MASK_CHANNEL 0x0F
 
 int command;
 int data1;
@@ -53,22 +60,45 @@ void loop() {
     // Split the command byte
     int op = (command >> 4);
 
-    // if it's aftertouch (0xD), so don't read the second data byte
-    if(op == 0xD){
-      data2 = 0;
-      handleAftertouch(command, data1);
-      // Don't do anything else in the loop when aftertouch is happening
-    } else {
-      data2 = Serial1.read();//read final byte
-      
-      if(data2 < 0){
+    switch(op) {
+      case COMMAND_PROGRAMCHANGE:
         data2 = 0;
-      }
+        handleProgramChange(command, data1);
+        break;
+
+      case COMMAND_AFTERTOUCH:
+        // if it's aftertouch (0xD), so don't read the second data byte
+        data2 = 0;
+        handleAftertouch(command, data1);
+        // Don't do anything else in the loop when aftertouch is happening
+        break;
+
+      default:
+        // Since it's not a special case, read the second data byte
+        data2 = Serial1.read();//read final byte
       
-      handleMidi(command, data1, data2);
-      // Do extra stuff here if you want to
+        if(data2 < 0){
+          data2 = 0;
+        }
+        
+        handleMidi(command, data1, data2);
+        // Do extra stuff here if you want to
     }
   }
+}
+
+void handleProgramChange(int command, int data1) {
+  // Do something special here like changing our output channel?
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0,0);
+  display.println("ProgramChg");
+  display.println(command);
+  display.println(data1);
+  display.display();
+  Serial1.write(command);
+  Serial1.write(data1);
 }
 
 void handleAftertouch(int command, int data1) {
