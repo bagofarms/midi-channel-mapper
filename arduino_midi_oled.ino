@@ -34,7 +34,7 @@ int data1;
 int data2;
 
 void setup() {
-  Serial1.begin(31250);
+  Serial.begin(31250);
 
   // OLED Display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -44,9 +44,9 @@ void setup() {
 void loop() {
   // Write values to screen
   //writeOLED(chanIn, chanOut);
-  if (Serial1.available() > 2){
-    command = Serial1.read();//read first byte
-    data1 = Serial1.read();//read next byte
+  if (Serial.available() > 2){
+    command = Serial.read();//read first byte
+    data1 = Serial.read();//read next byte
 
     // Error handling
     if(command < 127){
@@ -75,7 +75,7 @@ void loop() {
 
       default:
         // Since it's not a special case, read the second data byte
-        data2 = Serial1.read();//read final byte
+        data2 = Serial.read();//read final byte
       
         if(data2 < 0){
           data2 = 0;
@@ -97,15 +97,15 @@ void handleProgramChange(int command, int data1) {
   display.println(command);
   display.println(data1);
   display.display();
-  Serial1.write(command);
-  Serial1.write(data1);
+  Serial.write(command);
+  Serial.write(data1);
 }
 
 void handleAftertouch(int command, int data1) {
   // Don't do anything here because aftertouch sends data too fast
   // and it will bog down the serial reads.
-  Serial1.write(command);
-  Serial1.write(data1);
+  Serial.write(command);
+  Serial.write(data1);
 }
 
 void handleMidi(int command, int data1, int data2) {
@@ -117,7 +117,7 @@ void handleMidi(int command, int data1, int data2) {
   display.println(data1);
   display.println(data2);
   display.display();
-  Serial1.write(command);
-  Serial1.write(data1);
-  Serial1.write(data2);
+  Serial.write(command);
+  Serial.write(data1);
+  Serial.write(data2);
 }
