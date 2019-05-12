@@ -29,20 +29,24 @@ Adafruit_SSD1306 display(OLED_RESET);
 #define BUTTON_PIN 2
 volatile int button_state = 0;
 
+#define NO_OUTPUT 0
+
 #define DEBUG true
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 
-// When output pot is set to 17, make it dynamic
-byte dyn_channel = 1; // Programmatically selected
-byte man_channel = 1; // Manually selected
-byte in_channel = 1;  // Input channel
-byte prog_pass_channel = 14; // Channel to pass through program change events
+// byte prog_pass_channel = 14; // Channel to pass through program change events
+byte in_pot_channel = 0;
+byte out_pot_channel = 0;
+
+// Array to hold inputs and outputs.  Index is input channel, value is output channel.
+// 0 = No output, 1 = Midi Channel 1, ..., 16 = Midi Channel 16
+byte channel_map[17] = {NO_OUTPUT, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 
 void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(0, pin_ISR, LOW);
-  
+
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
 
@@ -75,12 +79,12 @@ void setup() {
 }
 
 void loop() {
+  getPotInputs();
   MIDI.read();
 }
 
-byte getOutChannel() {
-  // TODO: Switch between the dynamic and manual override channel
-  return dyn_channel;
+byte getOutChannel(in_channel) {
+  return channel_map[in_channel];
 }
 
 // -------------------------------------------
@@ -88,68 +92,66 @@ byte getOutChannel() {
 // -------------------------------------------
 
 void handleProgramChange(byte channel, byte number) {
-  // If we're on the input channel
-  if(channel == in_channel) {
-    dyn_channel = number;
-    dyn_channel += 1; // Adding 1 because the midi library is 1-indexed
-    displayChannels();
-  } else if(channel == prog_pass_channel) {
-    MIDI.sendProgramChange(number, prog_pass_channel);
+  byte out_channel = getOutChannel(channel);
+  if(out_channel === NO_OUTPUT) {
+    return;
   }
+
+  MIDI.sendProgramChange(number, out_channel);
 }
 
 void handleNoteOn(byte channel, byte note, byte velocity) {
-  if(channel == in_channel) {
-    if(DEBUG) { displayNoteOLED(channel, note, velocity); }
-    MIDI.sendNoteOn(note, velocity, getOutChannel());
-  } else if(channel == prog_pass_channel) {
-    MIDI.sendNoteOn(note, velocity, prog_pass_channel);
+  byte out_channel = getOutChannel(channel);
+  if(out_channel === NO_OUTPUT) {
+    return;
   }
+
+  MIDI.sendNoteOn(note, velocity, out_channel);
 }
 
 void handleNoteOff(byte channel, byte note, byte velocity) {
-  if(channel == in_channel) {
-    if(DEBUG) { displayNoteOLED(channel, note, velocity); }
-    MIDI.sendNoteOff(note, velocity, getOutChannel());
-  } else if(channel == prog_pass_channel) {
-    MIDI.sendNoteOff(note, velocity, prog_pass_channel);
+  byte out_channel = getOutChannel(channel);
+  if(out_channel === NO_OUTPUT) {
+    return;
   }
+
+  MIDI.sendNoteOff(note, velocity, out_channel);
 }
 
 void handlePitchBend(byte channel, int bend) {
-  if(channel == in_channel) {
-    if(DEBUG) { displayPitchBend(bend); }
-    MIDI.sendPitchBend(bend, getOutChannel());
-  } else if(channel == prog_pass_channel) {
-    MIDI.sendPitchBend(bend, prog_pass_channel);
+  byte out_channel = getOutChannel(channel);
+  if(out_channel === NO_OUTPUT) {
+    return;
   }
+
+  MIDI.sendPitchBend(bend, out_channel);
 }
 
 void handleControlChange(byte channel, byte number, byte value) {
-  if(channel == in_channel) {
-    if(DEBUG) { displayControlChange(number, value); }
-    MIDI.sendControlChange(number, value, getOutChannel());
-  } else if(channel == prog_pass_channel) {
-    MIDI.sendControlChange(number, value, prog_pass_channel);
+  byte out_channel = getOutChannel(channel);
+  if(out_channel === NO_OUTPUT) {
+    return;
   }
+
+  MIDI.sendControlChange(number, value, out_channel);
 }
 
 void handleAfterTouchPolyPressure(byte channel, byte note, byte pressure) {
-  if(channel == in_channel) {
-    if(DEBUG) { displayAfterTouchPolyPressure(note, pressure); }
-    MIDI.sendAfterTouch(note, pressure, getOutChannel());
-  } else if(channel == prog_pass_channel) {
-    MIDI.sendAfterTouch(note, pressure, prog_pass_channel);
+  byte out_channel = getOutChannel(channel);
+  if(out_channel === NO_OUTPUT) {
+    return;
   }
+
+  MIDI.sendAfterTouch(note, pressure, out_channel);
 }
 
 void handleAfterTouchChannelPressure(byte channel, byte pressure) {
-  if(channel == in_channel) {
-    if(DEBUG) { displayAfterTouchChannelPressure(pressure); }
-    MIDI.sendAfterTouch(pressure, getOutChannel());
-  } else if(channel == prog_pass_channel) {
-    MIDI.sendAfterTouch(pressure, prog_pass_channel);
+  byte out_channel = getOutChannel(channel);
+  if(out_channel === NO_OUTPUT) {
+    return;
   }
+
+  MIDI.sendAfterTouch(pressure, out_channel);
 }
 
 void handleTimeCodeQuarterFrame(byte data) {
@@ -199,8 +201,9 @@ void handleSystemReset() {
 // Manual input methods:
 // -------------------------------------------
 
-void getManualInputs() {
-  
+void getPotInputs() {
+  in_pot_channel = normalizePotInput(analogRead(CHAN_IN_POT));
+  out_pot_channel = normalizePotInput(analogRead(CHAN_OUT_POT));
 }
 
 int normalizePotInput(float rawIn) {
@@ -223,71 +226,76 @@ void displayChannels(){
   display.setTextSize(5);
 
   display.setCursor(0,SIZE5_2DIGIT_YOFFSET);
-  oledPrintWithLeadingZero(in_channel);
+  oledPrintWithLeadingZero(in_pot_channel);
 
   display.setCursor(SIZE5_2DIGIT_XOFFSET,SIZE5_2DIGIT_YOFFSET);
-  oledPrintWithLeadingZero(dyn_channel);
+  oledPrintWithLeadingZero(out_pot_channel);
 
   display.display();
 }
 
-void displayNoteOLED(byte channel, byte note, byte velocity) {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.print(channel);
-  display.print(" -> ");
-  display.print(dyn_channel);
-  display.setCursor(0,16);
-  display.println(note);
-  display.println(velocity);
-  display.display();
-}
+// void displayNoteOLED(byte channel, byte note, byte velocity) {
+//   display.clearDisplay();
+//   display.setTextSize(2);
+//   display.setTextColor(WHITE);
+//   display.setCursor(0,0);
+//   display.print(channel);
+//   display.print(" -> ");
+//   display.print(dyn_channel);
+//   display.setCursor(0,16);
+//   display.println(note);
+//   display.println(velocity);
+//   display.display();
+// }
 
-void displayPitchBend(int bend) {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.println("Pitch Bend");
-  display.println(bend);
-  display.display();
-}
+// void displayPitchBend(int bend) {
+//   display.clearDisplay();
+//   display.setTextSize(2);
+//   display.setTextColor(WHITE);
+//   display.setCursor(0,0);
+//   display.println("Pitch Bend");
+//   display.println(bend);
+//   display.display();
+// }
 
-void displayControlChange(byte number, byte value) {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 0);
-  display.println("CC");
-  display.println(number);
-  display.println(value);
-  display.display();
-}
+// void displayControlChange(byte number, byte value) {
+//   display.clearDisplay();
+//   display.setTextSize(2);
+//   display.setTextColor(WHITE);
+//   display.setCursor(0, 0);
+//   display.println("CC");
+//   display.println(number);
+//   display.println(value);
+//   display.display();
+// }
 
-void displayAfterTouchChannelPressure(byte pressure) {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 0);
-  display.println("AftrTouchChan");
-  display.println(pressure);
-  display.display();
-}
+// void displayAfterTouchChannelPressure(byte pressure) {
+//   display.clearDisplay();
+//   display.setTextSize(2);
+//   display.setTextColor(WHITE);
+//   display.setCursor(0, 0);
+//   display.println("AftrTouchChan");
+//   display.println(pressure);
+//   display.display();
+// }
 
-void displayAfterTouchPolyPressure(byte note, byte pressure) {
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(0, 0);
-  display.println("AftrTouchPoly");
-  display.println(note);
-  display.println(pressure);
-  display.display();
-}
+// void displayAfterTouchPolyPressure(byte note, byte pressure) {
+//   display.clearDisplay();
+//   display.setTextSize(2);
+//   display.setTextColor(WHITE);
+//   display.setCursor(0, 0);
+//   display.println("AftrTouchPoly");
+//   display.println(note);
+//   display.println(pressure);
+//   display.display();
+// }
 
 void oledPrintWithLeadingZero(byte val) {
+  if(val == NO_OUTPUT) {
+    display.print("--");
+    return;
+  }
+
   int leftDigit = val/10;
   if( leftDigit == 0 ) {
     display.print(0);
@@ -299,7 +307,6 @@ void oledPrintWithLeadingZero(byte val) {
 }
 
 void pin_ISR() {
-  button_state = digitalRead(BUTTON_PIN);
-  in_channel++;
+  channel_map[in_pot_channel] = out_pot_channel;
 }
 
