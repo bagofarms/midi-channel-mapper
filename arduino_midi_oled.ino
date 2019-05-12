@@ -27,7 +27,6 @@ Adafruit_SSD1306 display(OLED_RESET);
 
 // Button
 #define BUTTON_PIN 2
-volatile int button_state = 0;
 
 #define NO_OUTPUT 0
 
@@ -42,6 +41,10 @@ byte out_pot_channel = 0;
 // Array to hold inputs and outputs.  Index is input channel, value is output channel.
 // 0 = No output, 1 = Midi Channel 1, ..., 16 = Midi Channel 16
 byte channel_map[17] = {NO_OUTPUT, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+
+// Stuff that only runs every so often
+#define LOOP_DELAY 500
+int loop_ticks = 0;
 
 void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -71,6 +74,8 @@ void setup() {
 
   MIDI.turnThruOff();
 
+  getPotInputs();
+
   // OLED Display
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();  // You must do this after every draw action
@@ -79,11 +84,17 @@ void setup() {
 }
 
 void loop() {
-  getPotInputs();
   MIDI.read();
+
+  // Run the pot inputs and display channels every 100 loops
+  if(++loop_ticks == LOOP_DELAY){
+    //displayChannels();
+    getPotInputs();
+    loop_ticks = 0;
+  }
 }
 
-byte getOutChannel(in_channel) {
+byte getOutChannel(byte in_channel) {
   return channel_map[in_channel];
 }
 
@@ -93,7 +104,7 @@ byte getOutChannel(in_channel) {
 
 void handleProgramChange(byte channel, byte number) {
   byte out_channel = getOutChannel(channel);
-  if(out_channel === NO_OUTPUT) {
+  if(out_channel == NO_OUTPUT) {
     return;
   }
 
@@ -102,7 +113,7 @@ void handleProgramChange(byte channel, byte number) {
 
 void handleNoteOn(byte channel, byte note, byte velocity) {
   byte out_channel = getOutChannel(channel);
-  if(out_channel === NO_OUTPUT) {
+  if(out_channel == NO_OUTPUT) {
     return;
   }
 
@@ -111,7 +122,7 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
 
 void handleNoteOff(byte channel, byte note, byte velocity) {
   byte out_channel = getOutChannel(channel);
-  if(out_channel === NO_OUTPUT) {
+  if(out_channel == NO_OUTPUT) {
     return;
   }
 
@@ -120,7 +131,7 @@ void handleNoteOff(byte channel, byte note, byte velocity) {
 
 void handlePitchBend(byte channel, int bend) {
   byte out_channel = getOutChannel(channel);
-  if(out_channel === NO_OUTPUT) {
+  if(out_channel == NO_OUTPUT) {
     return;
   }
 
@@ -129,7 +140,7 @@ void handlePitchBend(byte channel, int bend) {
 
 void handleControlChange(byte channel, byte number, byte value) {
   byte out_channel = getOutChannel(channel);
-  if(out_channel === NO_OUTPUT) {
+  if(out_channel == NO_OUTPUT) {
     return;
   }
 
@@ -138,7 +149,7 @@ void handleControlChange(byte channel, byte number, byte value) {
 
 void handleAfterTouchPolyPressure(byte channel, byte note, byte pressure) {
   byte out_channel = getOutChannel(channel);
-  if(out_channel === NO_OUTPUT) {
+  if(out_channel == NO_OUTPUT) {
     return;
   }
 
@@ -147,7 +158,7 @@ void handleAfterTouchPolyPressure(byte channel, byte note, byte pressure) {
 
 void handleAfterTouchChannelPressure(byte channel, byte pressure) {
   byte out_channel = getOutChannel(channel);
-  if(out_channel === NO_OUTPUT) {
+  if(out_channel == NO_OUTPUT) {
     return;
   }
 
@@ -174,27 +185,27 @@ void handleTuneRequest() {
 // (These messages don't have their own sendX method, instead we must use a
 // lower-level send method from the library):
 void handleClock() {
-  MIDI.sendRealTime(MIDI::Clock);
+  MIDI.sendRealTime(midi::Clock);
 }
 
 void handleStart() {
-  MIDI.sendRealTime(MIDI::Start);
+  MIDI.sendRealTime(midi::Start);
 }
 
 void handleContinue() {
-  MIDI.sendRealTime(MIDI::Continue);
+  MIDI.sendRealTime(midi::Continue);
 }
 
 void handleStop() {
-  MIDI.sendRealTime(MIDI::Stop);
+  MIDI.sendRealTime(midi::Stop);
 }
 
 void handleActiveSensing() {
-  MIDI.sendRealTime(MIDI::ActiveSensing);
+  MIDI.sendRealTime(midi::ActiveSensing);
 }
 
 void handleSystemReset() {
-  MIDI.sendRealTime(MIDI::SystemReset);
+  MIDI.sendRealTime(midi::SystemReset);
 }
 
 // -------------------------------------------
@@ -207,7 +218,7 @@ void getPotInputs() {
 }
 
 int normalizePotInput(float rawIn) {
-  rawIn = rawIn/maxPotValue;
+  rawIn = rawIn/MAX_POT_VALUE;
   rawIn = rawIn * 16;
   return (int) (rawIn + 0.5f);
 }
@@ -218,10 +229,10 @@ int normalizePotInput(float rawIn) {
 
 void displayChannels(){
   display.clearDisplay();
-  display.setTextSize(2);
+  //display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.print(OLED_HEADER);
+  //display.setCursor(0,0);
+  //display.print(OLED_HEADER);
 
   display.setTextSize(5);
 
@@ -233,62 +244,6 @@ void displayChannels(){
 
   display.display();
 }
-
-// void displayNoteOLED(byte channel, byte note, byte velocity) {
-//   display.clearDisplay();
-//   display.setTextSize(2);
-//   display.setTextColor(WHITE);
-//   display.setCursor(0,0);
-//   display.print(channel);
-//   display.print(" -> ");
-//   display.print(dyn_channel);
-//   display.setCursor(0,16);
-//   display.println(note);
-//   display.println(velocity);
-//   display.display();
-// }
-
-// void displayPitchBend(int bend) {
-//   display.clearDisplay();
-//   display.setTextSize(2);
-//   display.setTextColor(WHITE);
-//   display.setCursor(0,0);
-//   display.println("Pitch Bend");
-//   display.println(bend);
-//   display.display();
-// }
-
-// void displayControlChange(byte number, byte value) {
-//   display.clearDisplay();
-//   display.setTextSize(2);
-//   display.setTextColor(WHITE);
-//   display.setCursor(0, 0);
-//   display.println("CC");
-//   display.println(number);
-//   display.println(value);
-//   display.display();
-// }
-
-// void displayAfterTouchChannelPressure(byte pressure) {
-//   display.clearDisplay();
-//   display.setTextSize(2);
-//   display.setTextColor(WHITE);
-//   display.setCursor(0, 0);
-//   display.println("AftrTouchChan");
-//   display.println(pressure);
-//   display.display();
-// }
-
-// void displayAfterTouchPolyPressure(byte note, byte pressure) {
-//   display.clearDisplay();
-//   display.setTextSize(2);
-//   display.setTextColor(WHITE);
-//   display.setCursor(0, 0);
-//   display.println("AftrTouchPoly");
-//   display.println(note);
-//   display.println(pressure);
-//   display.display();
-// }
 
 void oledPrintWithLeadingZero(byte val) {
   if(val == NO_OUTPUT) {
