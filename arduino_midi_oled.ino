@@ -25,6 +25,10 @@ Adafruit_SSD1306 display(OLED_RESET);
 #define CHAN_IN_POT 2
 #define CHAN_OUT_POT 3
 
+// Button
+#define BUTTON_PIN 2
+volatile int button_state = 0;
+
 #define DEBUG true
 
 MIDI_CREATE_DEFAULT_INSTANCE();
@@ -36,6 +40,9 @@ byte in_channel = 1;  // Input channel
 byte prog_pass_channel = 14; // Channel to pass through program change events
 
 void setup() {
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  attachInterrupt(0, pin_ISR, LOW);
+  
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
 
@@ -189,6 +196,20 @@ void handleSystemReset() {
 }
 
 // -------------------------------------------
+// Manual input methods:
+// -------------------------------------------
+
+void getManualInputs() {
+  
+}
+
+int normalizePotInput(float rawIn) {
+  rawIn = rawIn/maxPotValue;
+  rawIn = rawIn * 16;
+  return (int) (rawIn + 0.5f);
+}
+
+// -------------------------------------------
 // Display methods:
 // -------------------------------------------
 
@@ -275,5 +296,10 @@ void oledPrintWithLeadingZero(byte val) {
   }
 
   display.print(val % 10);
+}
+
+void pin_ISR() {
+  button_state = digitalRead(BUTTON_PIN);
+  in_channel++;
 }
 
