@@ -1,24 +1,9 @@
 #include <MIDI.h>
-
 #include <Wire.h> // Enable this line if using Arduino Uno, Mega, etc.
-
-#include <Adafruit_SSD1306.h>
-#include <Adafruit_SPITFT.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SPITFT_Macros.h>
-#include <gfxfont.h>
+#include "Adafruit_LEDBackpack.h"
 
-// OLED Display
-#define OLED_RESET 4
-Adafruit_SSD1306 display(OLED_RESET);
-
-#if (SSD1306_LCDHEIGHT != 64)
-#error("Height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
-
-#define SIZE5_2DIGIT_XOFFSET 68
-#define SIZE5_2DIGIT_YOFFSET 24
-#define OLED_HEADER " MIDItron"
+Adafruit_7segment matrix = Adafruit_7segment();
 
 // Potentiometer inputs
 #define MAX_POT_VALUE 1024
@@ -46,9 +31,11 @@ byte channel_map[17] = {NO_OUTPUT, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
 #define LOOP_DELAY 500
 int loop_ticks = 0;
 
+int button_state;
+
 void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  attachInterrupt(0, pin_ISR, LOW);
+  //attachInterrupt(0, pin_ISR, LOW);
 
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
@@ -76,19 +63,24 @@ void setup() {
 
   getPotInputs();
 
-  // OLED Display
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.display();  // You must do this after every draw action
-  delay(500);
+  // Display
+  matrix.begin(0x70);
+  matrix.setBrightness(1);
+  matrix.drawColon(true);
   displayChannels();
 }
 
 void loop() {
   MIDI.read();
+  
+  button_state = digitalRead(BUTTON_PIN);
+  if(button_state = LOW){
+    updateChannels();
+  }
 
   // Run the pot inputs and display channels every 100 loops
   if(++loop_ticks == LOOP_DELAY){
-    //displayChannels();
+    displayChannels();
     getPotInputs();
     loop_ticks = 0;
   }
@@ -228,40 +220,33 @@ int normalizePotInput(float rawIn) {
 // -------------------------------------------
 
 void displayChannels(){
-  display.clearDisplay();
-  //display.setTextSize(2);
-  display.setTextColor(WHITE);
-  //display.setCursor(0,0);
-  //display.print(OLED_HEADER);
-
-  display.setTextSize(5);
-
-  display.setCursor(0,SIZE5_2DIGIT_YOFFSET);
-  oledPrintWithLeadingZero(in_pot_channel);
-
-  display.setCursor(SIZE5_2DIGIT_XOFFSET,SIZE5_2DIGIT_YOFFSET);
-  oledPrintWithLeadingZero(out_pot_channel);
-
-  display.display();
+  displayLeft(in_pot_channel, false);
+  displayRight(out_pot_channel, false);
 }
 
-void oledPrintWithLeadingZero(byte val) {
-  if(val == NO_OUTPUT) {
-    display.print("--");
-    return;
-  }
-
+void displayLeft(byte val, bool dot) {
   int leftDigit = val/10;
   if( leftDigit == 0 ) {
-    display.print(0);
+    matrix.writeDigitRaw(0, 0B000000000);
   } else {
-    display.print(val / 10);
+    matrix.writeDigitNum(0, (val / 10), false);
   }
-
-  display.print(val % 10);
+  matrix.writeDigitNum(1, val % 10, dot);
+  matrix.writeDisplay();
 }
 
-void pin_ISR() {
+void displayRight(int val, bool dot) {
+  int leftDigit = val/10;
+  if( leftDigit == 0 ) {
+    matrix.writeDigitRaw(3, 0B000000000);
+  } else {
+    matrix.writeDigitNum(3, (val / 10), false);
+  }
+  matrix.writeDigitNum(4, val % 10, dot);
+  matrix.writeDisplay();
+}
+
+void updateChannels() {
   channel_map[in_pot_channel] = out_pot_channel;
 }
 
