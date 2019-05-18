@@ -25,8 +25,6 @@ byte last_in_pot_channel = 0;
 byte last_out_pot_channel = 0;
 bool is_out_pot_dirty = false;
 
-// @TODO - IDEA. On startup hold down the SAVE Button and power on.
-// In that case the default is all channels will always be routed to "--".
 
 // The hardware contains two knobs, a 4-segment LED and a button, and is setup as follows:
 // ------------------
@@ -267,9 +265,9 @@ void handleSystemReset()
 void getPotInputs()
 {
   // In pot should read OMNI (0), then 1 to 16
-  in_pot_channel = normalizePotInput(analogRead(CHAN_IN_POT));
+  in_pot_channel = normalizePotInput(analogRead(CHAN_IN_POT), true);
   // Out pot should read OFF, then 1 to 16
-  out_pot_channel = normalizePotInput(analogRead(CHAN_OUT_POT));
+  out_pot_channel = normalizePotInput(analogRead(CHAN_OUT_POT), false);
 
   // If the in pot has changed then reset the out pot dirty state
   // (in other words, any un-saved out pot value is discarded)
@@ -294,11 +292,19 @@ void getPotInputs()
   last_out_pot_channel = out_pot_channel;
 }
 
-int normalizePotInput(float rawIn)
+int normalizePotInput(float rawIn, bool zeroIndex)
 {
   rawIn = rawIn / MAX_POT_VALUE;
   rawIn = rawIn * (TOTAL_POT_STEPS - 1);
-  return (int)(rawIn + 0.5f) + 1;
+  int out = (int)(rawIn + 0.5f);
+
+  // Putting this here because the channel input starts at zero,
+  // but the channel output starts at 1 and goes to "--"
+  if (!zeroIndex)
+  {
+    out += 1;
+  }
+  return out;
 }
 
 // -------------------------------------------
