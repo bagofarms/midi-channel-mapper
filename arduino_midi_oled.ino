@@ -10,9 +10,6 @@ Adafruit_7segment matrix = Adafruit_7segment();
 #define CHAN_IN_POT 2
 #define CHAN_OUT_POT 3
 
-// Button
-#define BUTTON_PIN 2
-
 #define DEBUG true
 
 MIDI_CREATE_DEFAULT_INSTANCE();
@@ -68,12 +65,14 @@ byte channel_map[17] = {MIDI_CHANNEL_OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
 // Array to keep track of which channels are active. We use this information to display
 // a dot in the LED display next to the input channel (so the user can see visually
 // which channels are getting messages)
-bool active_map[17] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false}
+bool active_map[17] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false};
 
 // Stuff that only runs every so often
 #define LOOP_DELAY 500
 int loop_ticks = 0;
 
+// Button
+#define BUTTON_PIN 4
 int button_state;
 
 void setup()
@@ -109,7 +108,13 @@ void setup()
   // Display
   matrix.begin(0x70);
   matrix.setBrightness(1);
-  matrix.drawColon(true);
+  matrix.drawColon(false);
+  matrix.writeDigitNum(0, 0, false);
+  matrix.writeDigitNum(1, 0, false);
+  matrix.writeDigitNum(3, 0, false);
+  matrix.writeDigitNum(4, 0, false);
+  matrix.writeDisplay();
+  delay(500);
   displayChannels();
 }
 
@@ -118,7 +123,7 @@ void loop()
   MIDI.read();
 
   button_state = digitalRead(BUTTON_PIN);
-  if (button_state = LOW)
+  if (button_state == LOW)
   {
     updateChannels();
   }
@@ -140,7 +145,7 @@ byte getOutChannel(byte in_channel)
   // then send ALL messages to that channel!
   if (isOMNIMode())
   {
-    return channel_map[MIDI_CHANNEL_OMNI]
+    return channel_map[MIDI_CHANNEL_OMNI];
   }
 
   return channel_map[in_channel];
@@ -349,13 +354,13 @@ void updateChannels()
   channel_map[in_pot_channel] = out_pot_channel;
 }
 
-void markChannelAsActive(channel)
+void markChannelAsActive(byte channel)
 {
   active_map[MIDI_CHANNEL_OMNI] = true;
   active_map[channel] = true;
 }
 
-void isChannelActive(channel)
+bool isChannelActive(byte channel)
 {
   return active_map[channel];
 }
