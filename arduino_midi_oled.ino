@@ -278,6 +278,12 @@ void getPotInputs()
   {
     is_out_pot_dirty = true;
   }
+  // If the out pot has changed back to the currently set value
+  // of the input, the out pot is not dirty anymore
+  else if (is_out_pot_dirty && out_pot_channel == channel_map[in_pot_channel])
+  {
+    is_out_pot_dirty = false;
+  }
 
   last_in_pot_channel = in_pot_channel;
   last_out_pot_channel = out_pot_channel;
@@ -352,6 +358,7 @@ void displayRight(int val, bool dot)
 void updateChannels()
 {
   channel_map[in_pot_channel] = out_pot_channel;
+  is_out_pot_dirty = false;
 }
 
 void markChannelAsActive(byte channel)
