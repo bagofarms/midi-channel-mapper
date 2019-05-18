@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include <MIDI.h>
 #include <Wire.h> // Enable this line if using Arduino Uno, Mega, etc.
 #include <Adafruit_GFX.h>
@@ -70,6 +71,11 @@ byte channel_map[17] = {MIDI_CHANNEL_OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
 // which channels are getting messages)
 bool active_map[17] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false};
 
+// EEPROM Addresses
+#define INIT_ADDR 0 // value of 1 if memory has been initialized
+#define CHANNEL_MAP_ADDR 1 // 1 - 17
+#define ACTIVE_MAP_ADDR 18 // 18 - 34
+
 // Stuff that only runs every so often
 #define LOOP_DELAY 500
 int loop_ticks = 0;
@@ -80,8 +86,31 @@ int button_state;
 
 void setup()
 {
+  // Load saved data from EEPROM if it has been initialized
+  byte isInit = EEPROM.read(INIT_ADDR);
+  if (isInit == 1)
+  {
+    for (int i = 0; i < 17; i++)
+    {
+      channel_map[i] = EEPROM.read(CHANNEL_MAP_ADDR + i);
+      active_map[i] = (bool)EEPROM.read(ACTIVE_MAP_ADDR + i);
+    }
+  }
+  // Otherwise, initialize the EEPROM
+  else
+  {
+    for (int i = 0; i < 17; i++)
+    {
+      EEPROM.write(CHANNEL_MAP_ADDR + i, channel_map[i]);
+      EEPROM.write(ACTIVE_MAP_ADDR + i, (byte)active_map[i]);
+    }
+
+    // Set the initialized flag
+    EEPROM.write(INIT_ADDR, 1);
+  }
+
+  // Save Button
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  //attachInterrupt(0, pin_ISR, LOW);
 
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
@@ -313,12 +342,18 @@ int normalizePotInput(float rawIn, bool zeroIndex)
 
 void displayChannels()
 {
+  bool isOmni = isOMNIMode();
+
+  // Display the colons if in omni mode to indicate locked outputs
+  matrix.drawColon(isOmni);
+  
   // We display the left dot if we got a MIDI message on that channel:
   displayLeft(in_pot_channel, isChannelActive(in_pot_channel));
 
   // If the out pot has been rotated (is_out_pot_dirty=true) then we display
   // the current actual out pot value along with the 'dirty' dot.
-  if (is_out_pot_dirty)
+  // If we're in omni mode, ignore this case.
+  if (is_out_pot_dirty && (!isOmni || in_pot_channel == 0))
   {
     displayRight(out_pot_channel, true);
   }
@@ -373,14 +408,24 @@ void displayRight(int val, bool dot)
 
 void updateChannels()
 {
-  channel_map[in_pot_channel] = out_pot_channel;
-  is_out_pot_dirty = false;
+  // If we're in omni mode, ignore all changes except for 0
+  if (!isOMNIMode() || in_pot_channel == 0)
+  {
+    channel_map[in_pot_channel] = out_pot_channel;
+    EEPROM.write(CHANNEL_MAP_ADDR + in_pot_channel, out_pot_channel);
+    
+    is_out_pot_dirty = false;
+  }
+  
 }
 
 void markChannelAsActive(byte channel)
 {
   active_map[MIDI_CHANNEL_OMNI] = true;
+  EEPROM.write(ACTIVE_MAP_ADDR + MIDI_CHANNEL_OMNI, 1);
+  
   active_map[channel] = true;
+  EEPROM.write(ACTIVE_MAP_ADDR + channel, 1);
 }
 
 bool isChannelActive(byte channel)
@@ -407,4 +452,9 @@ void resetActiveStateForAllChannels()
   active_map[14] = false;
   active_map[15] = false;
   active_map[16] = false;
+
+  for (int i = 0; i < 18; i++)
+  {
+    EEPROM.write(ACTIVE_MAP_ADDR + i, 0);
+  }
 }
