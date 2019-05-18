@@ -5,8 +5,13 @@
 
 Adafruit_7segment matrix = Adafruit_7segment();
 
+// Matrix raw display values
+#define MATRIX_BLANK 0B000000000
+#define MATRIX_DASH 0B001000000
+
 // Potentiometer inputs
 #define MAX_POT_VALUE 1024
+#define TOTAL_POT_STEPS 17
 #define CHAN_IN_POT 2
 #define CHAN_OUT_POT 3
 
@@ -292,8 +297,8 @@ void getPotInputs()
 int normalizePotInput(float rawIn)
 {
   rawIn = rawIn / MAX_POT_VALUE;
-  rawIn = rawIn * 16;
-  return (int)(rawIn + 0.5f);
+  rawIn = rawIn * (TOTAL_POT_STEPS - 1);
+  return (int)(rawIn + 0.5f) + 1;
 }
 
 // -------------------------------------------
@@ -339,19 +344,24 @@ void displayRight(int val, bool dot)
 {
   if (val == MIDI_CHANNEL_OFF)
   {
-    //@TODO - DISPLAY "--"
-  }
-
-  int leftDigit = val / 10;
-  if (leftDigit == 0)
-  {
-    matrix.writeDigitRaw(3, 0B000000000);
+    // Display "--"
+    matrix.writeDigitRaw(3, MATRIX_DASH);
+    matrix.writeDigitRaw(4, MATRIX_DASH);
   }
   else
   {
-    matrix.writeDigitNum(3, (val / 10), false);
+    int leftDigit = val / 10;
+    if (leftDigit == 0)
+    {
+      matrix.writeDigitRaw(3, MATRIX_BLANK);
+    }
+    else
+    {
+      matrix.writeDigitNum(3, (val / 10), false);
+    }
+    matrix.writeDigitNum(4, val % 10, dot);
   }
-  matrix.writeDigitNum(4, val % 10, dot);
+  
   matrix.writeDisplay();
 }
 
