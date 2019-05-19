@@ -6,6 +6,8 @@
 
 Adafruit_7segment matrix = Adafruit_7segment();
 
+#define SOFTWARE_VERSION 1
+
 // Matrix raw display values
 #define MATRIX_BLANK 0B000000000
 #define MATRIX_DASH 0B001000000
@@ -72,9 +74,8 @@ byte channel_map[17] = {MIDI_CHANNEL_OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
 bool active_map[17] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false};
 
 // EEPROM Addresses
-#define INIT_ADDR 0 // value of 1 if memory has been initialized
+#define VERSION_ADDR 0 // value of 1 if memory has been initialized
 #define CHANNEL_MAP_ADDR 1 // 1 - 17
-#define ACTIVE_MAP_ADDR 18 // 18 - 34
 
 // Stuff that only runs every so often
 #define LOOP_DELAY 500
@@ -86,31 +87,48 @@ int button_state;
 
 void setup()
 {
+  // Save Button
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  button_state = digitalRead(BUTTON_PIN);
+  
   // Load saved data from EEPROM if it has been initialized
-  byte isInit = EEPROM.read(INIT_ADDR);
-  if (isInit == 1)
+  byte versionNum = EEPROM.read(VERSION_ADDR);
+  if ((versionNum == SOFTWARE_VERSION) && (button_state == HIGH))
   {
-    for (int i = 0; i < 17; i++)
-    {
-      channel_map[i] = EEPROM.read(CHANNEL_MAP_ADDR + i);
-      active_map[i] = (bool)EEPROM.read(ACTIVE_MAP_ADDR + i);
-    }
+    EEPROM.get(CHANNEL_MAP_ADDR, channel_map);
   }
   // Otherwise, initialize the EEPROM
   else
   {
-    for (int i = 0; i < 17; i++)
-    {
-      EEPROM.write(CHANNEL_MAP_ADDR + i, channel_map[i]);
-      EEPROM.write(ACTIVE_MAP_ADDR + i, (byte)active_map[i]);
-    }
+    EEPROM.put(CHANNEL_MAP_ADDR, channel_map);
 
     // Set the initialized flag
-    EEPROM.write(INIT_ADDR, 1);
+    EEPROM.write(VERSION_ADDR, 1);
   }
 
-  // Save Button
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  // Init display
+  matrix.begin(0x70);
+  matrix.drawColon(false);
+  matrix.writeDigitRaw(0, MATRIX_BLANK);
+  matrix.writeDigitRaw(1, MATRIX_BLANK);
+  matrix.writeDigitRaw(3, MATRIX_BLANK);
+  matrix.writeDigitRaw(4, MATRIX_BLANK);
+  matrix.writeDisplay();
+
+  while(button_state == LOW)
+  {
+    button_state = digitalRead(BUTTON_PIN);
+  }
+  
+  // Display Zeroes
+  
+  matrix.setBrightness(1);
+  matrix.writeDigitNum(0, 0, false);
+  matrix.writeDigitNum(1, 0, false);
+  matrix.writeDigitNum(3, 0, false);
+  matrix.writeDigitNum(4, 0, false);
+  matrix.writeDisplay();
+  delay(1000);
 
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
@@ -136,17 +154,6 @@ void setup()
   MIDI.turnThruOff();
 
   getPotInputs();
-
-  // Display
-  matrix.begin(0x70);
-  matrix.setBrightness(1);
-  matrix.drawColon(false);
-  matrix.writeDigitNum(0, 0, false);
-  matrix.writeDigitNum(1, 0, false);
-  matrix.writeDigitNum(3, 0, false);
-  matrix.writeDigitNum(4, 0, false);
-  matrix.writeDisplay();
-  delay(500);
   displayChannels();
 }
 
@@ -369,7 +376,7 @@ void displayLeft(byte val, bool dot)
   int leftDigit = val / 10;
   if (leftDigit == 0)
   {
-    matrix.writeDigitRaw(0, 0B000000000);
+    matrix.writeDigitRaw(0, MATRIX_BLANK);
   }
   else
   {
@@ -409,7 +416,7 @@ void displayRight(int val, bool dot)
 void updateChannels()
 {
   // If we're in omni mode, ignore all changes except for 0
-  if (!isOMNIMode() || in_pot_channel == 0)
+  if ((!isOMNIMode() || in_pot_channel == 0) && is_out_pot_dirty)
   {
     channel_map[in_pot_channel] = out_pot_channel;
     EEPROM.write(CHANNEL_MAP_ADDR + in_pot_channel, out_pot_channel);
@@ -422,10 +429,8 @@ void updateChannels()
 void markChannelAsActive(byte channel)
 {
   active_map[MIDI_CHANNEL_OMNI] = true;
-  EEPROM.write(ACTIVE_MAP_ADDR + MIDI_CHANNEL_OMNI, 1);
   
   active_map[channel] = true;
-  EEPROM.write(ACTIVE_MAP_ADDR + channel, 1);
 }
 
 bool isChannelActive(byte channel)
@@ -452,9 +457,4 @@ void resetActiveStateForAllChannels()
   active_map[14] = false;
   active_map[15] = false;
   active_map[16] = false;
-
-  for (int i = 0; i < 18; i++)
-  {
-    EEPROM.write(ACTIVE_MAP_ADDR + i, 0);
-  }
 }
