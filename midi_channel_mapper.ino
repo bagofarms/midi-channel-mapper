@@ -22,8 +22,8 @@ Adafruit_7segment matrix = Adafruit_7segment();
 #define CHAN_IN_POT 2
 #define CHAN_OUT_POT 3
 float EMA_a = 0.6;      //initialization of EMA alpha
-int EMA_S_in = 0;          //initialization of EMA S
-int EMA_S_out = 0;          //initialization of EMA S
+int EMA_S_in = 0;       //initialization of EMA S for input channel
+int EMA_S_out = 0;      //initialization of EMA S for output channel
 
 #define DEBUG true
 
@@ -34,42 +34,6 @@ byte out_pot_channel = 0;
 byte last_in_pot_channel = 0;
 byte last_out_pot_channel = 0;
 bool is_out_pot_dirty = false;
-
-
-// The hardware contains two knobs, a 4-segment LED and a button, and is setup as follows:
-// ------------------
-// | [00.--.]       |
-// | (I) (O) [SAVE] |
-// ------------------
-// * The first knob (I) is the INPUT SELECTOR.
-//    * It has 17 steps labeled: OMNI, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
-// * The second knob (O) is the OUTPUT SELECTOR.
-//    * It has 17 setps labeled:  OFF, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
-// * The first two digits on the LCD are the INPUT CHANNEL.
-// * The first dot on the LCD is the ACTIVE CHANNEL INDICATOR.
-// * The second two digits on the LCD  are the OUTPUT CHANNEL.
-// * The second dot on the LCD is the OUTPUT CHANNEL DIRTY INDICATOR.
-// * The save button is the... SAVE BUTTON.
-// The user can turn the INPUT SELECTOR to select the INPUT CHANNEL,
-// then turn the OUTPUT SELECTOR to set the OUTPUT CHANNEL.
-// This will route all messages on the INPUT CHANNEL to the selected OUTPUT CHANNEL,
-// however this re-routing will not take effect until it is saved with the SAVE BUTTON.
-// **There are two special cases:
-// A. When the INPUT CHANNEL is set to "00" by default the OUTPUT CHANNEL is set to "--" (17).
-//    This is NORMAL MODE. If the user changes the OUTPUT CHANNEL to some value other than
-//    "--" while the INPUT CHANNEL is "00" then this is OMNI MODE. In OMNI MODE *all*
-//    messages on *all* channels will be sent to the OUTPUT CHANNEL. Setting the
-//    OUTPUT CHANNEL back to "--" when the INPUT CHANNEL is "00" returns to NORMAL MODE.
-// B. When the OUTPUT CHANNEL is set to "--" this *disables* the output for the given
-//    INPUT CHANNEL.
-// When the user changes the INPUT SELECTOR the routing for the INPUT CHANNEL and
-// OUTPUT CHANNEL are shown. If the user changes the OUTPUT SELECTOR then the
-// DIRTY INDICATOR is lit and the OUTPUT CHANNEL display updates. Use the SAVE BUTTON
-// to write this new routing. Changing the INPUT SELECTOR to a different INPUT CHANNEL
-// will disregard any pending new routing and will reset the DIRTY INDICATOR to off.
-// If the user is on INPUT CHANNEL "00" then the ACTIVE CHANNEL INDICATOR will light up
-// if a MIDI message is being recieved on ANY midi channel. Otherwise, the ACTIVE CHANNEL
-// INDICATOR will display if the current INPUT CHANNEL displayed is getting midi messages.
 
 // Array to hold inputs and outputs.  Index is input channel, value is output channel.
 // 0 = No output, 1 = Midi Channel 1, ..., 16 = Midi Channel 16
