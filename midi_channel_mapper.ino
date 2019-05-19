@@ -8,6 +8,10 @@ Adafruit_7segment matrix = Adafruit_7segment();
 
 #define SOFTWARE_VERSION 1
 
+// Number of seconds to hold down save button on power up to enter
+// "all outputs disabled" mode
+#define DISABLE_OUTPUTS_DELAY 4
+
 // Matrix raw display values
 #define MATRIX_BLANK 0B000000000
 #define MATRIX_DASH 0B001000000
@@ -115,9 +119,29 @@ void setup()
   matrix.writeDigitRaw(4, MATRIX_BLANK);
   matrix.writeDisplay();
 
+  int counter = 0;
   while(button_state == LOW)
   {
+    if(counter > (DISABLE_OUTPUTS_DELAY * 10))
+    {
+      matrix.writeDigitRaw(0, MATRIX_DASH);
+      matrix.writeDigitRaw(1, MATRIX_DASH);
+      matrix.writeDigitRaw(3, MATRIX_DASH);
+      matrix.writeDigitRaw(4, MATRIX_DASH);
+      matrix.writeDisplay();
+    }
+    else
+    {
+      counter++;
+    }
     button_state = digitalRead(BUTTON_PIN);
+    delay(100);
+  }
+
+  // If the user held the button long enough, disable all channels
+  if(counter > (DISABLE_OUTPUTS_DELAY * 10))
+  {
+    disableAllChannels();
   }
   
   // Display Zeroes
@@ -424,6 +448,28 @@ void updateChannels()
     is_out_pot_dirty = false;
   }
   
+}
+
+void disableAllChannels()
+{
+  channel_map[MIDI_CHANNEL_OMNI] = MIDI_CHANNEL_OFF;
+  channel_map[1] = MIDI_CHANNEL_OFF;
+  channel_map[2] = MIDI_CHANNEL_OFF;
+  channel_map[3] = MIDI_CHANNEL_OFF;
+  channel_map[4] = MIDI_CHANNEL_OFF;
+  channel_map[5] = MIDI_CHANNEL_OFF;
+  channel_map[6] = MIDI_CHANNEL_OFF;
+  channel_map[7] = MIDI_CHANNEL_OFF;
+  channel_map[8] = MIDI_CHANNEL_OFF;
+  channel_map[9] = MIDI_CHANNEL_OFF;
+  channel_map[10] = MIDI_CHANNEL_OFF;
+  channel_map[11] = MIDI_CHANNEL_OFF;
+  channel_map[12] = MIDI_CHANNEL_OFF;
+  channel_map[13] = MIDI_CHANNEL_OFF;
+  channel_map[14] = MIDI_CHANNEL_OFF;
+  channel_map[15] = MIDI_CHANNEL_OFF;
+  channel_map[16] = MIDI_CHANNEL_OFF;
+  EEPROM.put(CHANNEL_MAP_ADDR, channel_map);
 }
 
 void markChannelAsActive(byte channel)
