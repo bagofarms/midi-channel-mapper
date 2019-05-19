@@ -21,6 +21,9 @@ Adafruit_7segment matrix = Adafruit_7segment();
 #define TOTAL_POT_STEPS 17
 #define CHAN_IN_POT 2
 #define CHAN_OUT_POT 3
+float EMA_a = 0.6;      //initialization of EMA alpha
+int EMA_S_in = 0;          //initialization of EMA S
+int EMA_S_out = 0;          //initialization of EMA S
 
 #define DEBUG true
 
@@ -325,9 +328,9 @@ void handleSystemReset()
 void getPotInputs()
 {
   // In pot should read OMNI (0), then 1 to 16
-  in_pot_channel = normalizePotInput(analogRead(CHAN_IN_POT), true);
+  in_pot_channel = normalizePotInput(emaSmooth(analogRead(CHAN_IN_POT), &EMA_S_in), true);
   // Out pot should read OFF, then 1 to 16
-  out_pot_channel = normalizePotInput(analogRead(CHAN_OUT_POT), false);
+  out_pot_channel = normalizePotInput(emaSmooth(analogRead(CHAN_OUT_POT), &EMA_S_out), false);
 
   // If the in pot has changed then reset the out pot dirty state
   // (in other words, any un-saved out pot value is discarded)
@@ -365,6 +368,12 @@ int normalizePotInput(float rawIn, bool zeroIndex)
     out += 1;
   }
   return out;
+}
+
+int emaSmooth(int sensorValue, int* EMA_S)
+{
+  *EMA_S = (EMA_a*sensorValue) + ((1-EMA_a) * (*EMA_S));
+  return *EMA_S;
 }
 
 // -------------------------------------------
